@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>QuestCast · Meta Quest 3 投屏</title>
+<style>
+  :root{
+    --bg:#f5f6f8; --card:#ffffff; --line:#e6e8ec; --line-soft:#eef0f4;
+    --ink:#101828; --ink-2:#475467; --muted:#8a94a6;
+    --accent:#4f46e5; --accent-soft:#eef0ff;
+    --ok:#12b76a; --ok-soft:#e7f8f0; --warn:#f79009; --warn-soft:#fef4e6; --err:#f04438;
+    --radius:14px;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    background:var(--bg); color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+    font-size:14px; line-height:1.55; -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:1120px;margin:0 auto;padding:26px 22px 40px}
+
+  /* header */
+  header{display:flex;align-items:center;gap:14px;margin-bottom:22px}
+  .mark{
+    width:40px;height:40px;border-radius:12px;flex:0 0 auto;
+    background:linear-gradient(145deg,#6366f1,#4f46e5);
+    display:flex;align-items:center;justify-content:center;
+    box-shadow:0 6px 16px rgba(79,70,229,.28);
+  }
+  .mark svg{width:22px;height:22px}
+  h1{font-size:18px;margin:0;letter-spacing:-.2px;font-weight:650}
+  .sub{font-size:12.5px;color:var(--muted);margin-top:1px}
+  .spacer{flex:1}
+  .pill{
+    display:inline-flex;align-items:center;gap:7px;padding:7px 13px;border-radius:999px;
+    background:#fff;border:1px solid var(--line);font-size:12.5px;font-weight:550;color:var(--ink-2);
+    box-shadow:0 1px 2px rgba(16,24,40,.04);
+  }
+  .dot{width:7px;height:7px;border-radius:50%;background:var(--muted)}
+  .dot.ok{background:var(--ok);box-shadow:0 0 0 3px rgba(18,183,106,.16)}
+  .dot.warn{background:var(--warn);box-shadow:0 0 0 3px rgba(247,144,9,.16)}
+  .dot.live{background:var(--err);box-shadow:0 0 0 3px rgba(240,68,56,.16);animation:pulse 1.6s infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+
+  /* layout */
+  .grid{display:grid;grid-template-columns:1fr 1.12fr;gap:16px;align-items:start}
+  @media(max-width:880px){.grid{grid-template-columns:1fr}}
+  .col{display:flex;flex-direction:column;gap:16px}
+
+  .card{
+    background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+    padding:18px;box-shadow:0 1px 2px rgba(16,24,40,.04);
+  }
+  .card h2{
+    font-size:12px;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);
+    margin:0 0 14px;font-weight:650;
+  }
+
+  /* device */
+  .dev{display:flex;gap:13px;align-items:center;padding:13px;border:1px solid var(--line-soft);border-radius:11px;background:#fbfcfd}
+  .dev .ico{width:38px;height:38px;border-radius:10px;background:var(--accent-soft);display:flex;align-items:center;justify-content:center;flex:0 0 auto}
+  .dev .ico svg{width:20px;height:20px;stroke:var(--accent)}
+  .dev .nm{font-weight:600;font-size:14px}
+  .dev .meta{font-size:12px;color:var(--muted);margin-top:2px}
+  .empty{
+    padding:20px 14px;text-align:center;color:var(--muted);font-size:13px;
+    border:1px dashed var(--line);border-radius:11px;background:#fcfcfd;
+  }
+  .hint{font-size:12px;color:var(--muted);margin-top:11px;line-height:1.6}
+
+  /* fields */
+  .field{margin-bottom:14px}
+  .field:last-child{margin-bottom:0}
+  label.lbl{display:block;font-size:12.5px;color:var(--ink-2);font-weight:550;margin-bottom:6px}
+  select,input[type=text]{
+    width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:9px;background:#fff;
+    font-size:13.5px;color:var(--ink);font-family:inherit;outline:none;transition:border-color .15s,box-shadow .15s;
+  }
+  select:focus,input[type=text]:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(79,70,229,.12)}
+  .row{display:flex;gap:9px}
+  .row>*{flex:1}
+
+  /* toggles */
+  .toggles{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:4px}
+  .tg{
+    display:flex;align-items:center;gap:9px;padding:9px 11px;border:1px solid var(--line);
+    border-radius:9px;cursor:pointer;user-select:none;font-size:13px;color:var(--ink-2);
+    transition:all .15s;background:#fff;
+  }
+  .tg:hover{border-color:#d3d8e0}
+  .tg input{display:none}
+  .sw{width:30px;height:17px;border-radius:99px;background:#dfe3ea;position:relative;transition:background .18s;flex:0 0 auto}
+  .sw::after{content:"";position:absolute;top:2px;left:2px;width:13px;height:13px;border-radius:50%;background:#fff;transition:transform .18s;box-shadow:0 1px 2px rgba(16,24,40,.2)}
+  .tg input:checked+.sw{background:var(--accent)}
+  .tg input:checked+.sw::after{transform:translateX(13px)}
+  .tg.on{background:var(--accent-soft);border-color:#c7cbff;color:var(--accent);font-weight:550}
+
+  /* buttons */
+  .btn{
+    display:inline-flex;align-items:center;justify-content:center;gap:7px;
+    padding:11px 16px;border-radius:10px;border:1px solid var(--line);background:#fff;
+    font-size:13.5px;font-weight:600;color:var(--ink-2);cursor:pointer;font-family:inherit;
+    transition:all .15s;
+  }
+  .btn:hover{border-color:#d3d8e0;background:#fafbfc}
+  .btn:disabled{opacity:.45;cursor:not-allowed}
+  .btn.primary{
+    background:linear-gradient(180deg,#5b52e8,#4f46e5);border-color:#4f46e5;color:#fff;
+    box-shadow:0 2px 6px rgba(79,70,229,.28);
+  }
+  .btn.primary:hover{filter:brightness(1.06)}
+  .btn.danger{background:#fff;border-color:#fbd5d1;color:var(--err)}
+  .btn.danger:hover{background:#fff5f4}
+  .btn.sm{padding:8px 12px;font-size:12.5px;border-radius:9px}
+  .actions{display:flex;gap:9px;margin-top:16px}
+  .actions .btn.primary{flex:1}
+
+  /* live banner */
+  .live{
+    display:none;align-items:center;gap:11px;padding:12px 14px;border-radius:11px;
+    background:linear-gradient(90deg,#fff5f4,#fffaf9);border:1px solid #fbd5d1;margin-bottom:16px;
+  }
+  .live.show{display:flex}
+  .live .t{font-weight:600;font-size:13.5px;color:#b42318}
+  .live .clock{margin-left:auto;font-variant-numeric:tabular-nums;font-size:13px;color:#b42318;font-weight:600}
+  .warnbar{background:linear-gradient(90deg,#fffaeb,#fffdf7);border-color:#fbd5a1}
+  .warnbar .t{color:#b54708;margin-right:6px}
+
+  /* onboarding */
+  .onboard{
+    display:none;background:linear-gradient(135deg,#f4f3ff,#fbfbff);border:1px solid #dedcfb;
+    border-radius:var(--radius);padding:20px;margin-bottom:16px;
+  }
+  .onboard.show{display:block}
+  .onboard h3{margin:0 0 4px;font-size:15px;font-weight:650}
+  .onboard p{margin:0 0 14px;font-size:13px;color:var(--ink-2)}
+  .steps{display:grid;grid-template-columns:repeat(3,1fr);gap:11px;margin-bottom:16px}
+  @media(max-width:760px){.steps{grid-template-columns:1fr}}
+  .step{background:#fff;border:1px solid #e8e6fb;border-radius:11px;padding:13px}
+  .step .n{
+    width:20px;height:20px;border-radius:6px;background:var(--accent);color:#fff;
+    font-size:11.5px;font-weight:700;display:flex;align-items:center;justify-content:center;margin-bottom:7px;
+  }
+  .step .st{font-size:13px;font-weight:600;margin-bottom:3px}
+  .step .sd{font-size:12px;color:var(--muted);line-height:1.5}
+
+  /* log */
+  .logcard{margin-top:16px}
+  .logbar{display:flex;align-items:center;margin-bottom:10px}
+  .logbar h2{margin:0}
+  .log{
+    background:#0e1420;border-radius:11px;padding:12px 14px;height:190px;overflow-y:auto;
+    font-family:"SFMono-Regular",Consolas,"Liberation Mono",monospace;font-size:12px;line-height:1.75;
+  }
+  .log::-webkit-scrollbar{width:8px}
+  .log::-webkit-scrollbar-thumb{background:#2b3648;border-radius:4px}
+  .ln{color:#9aa8bd;white-space:pre-wrap;word-break:break-all}
+  .ln .tm{color:#4d5b70;margin-right:8px}
+  .ln.ok{color:#5ee2a0}
+  .ln.warn{color:#f5c26b}
+  .ln.err{color:#ff8a80}
+
+  /* toast */
+  #toast{
+    position:fixed;left:50%;bottom:28px;transform:translate(-50%,20px);opacity:0;pointer-events:none;
+    background:#101828;color:#fff;padding:11px 18px;border-radius:10px;font-size:13px;font-weight:550;
+    box-shadow:0 8px 24px rgba(16,24,40,.24);transition:all .22s;z-index:99;max-width:80vw;
+  }
+  #toast.show{opacity:1;transform:translate(-50%,0)}
+  .rec-item{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--ink-2);padding:6px 0;border-bottom:1px solid var(--line-soft)}
+  .rec-item:last-child{border-bottom:0}
+  .rec-item .sz{margin-left:auto;color:var(--muted);font-size:11.5px}
+  details summary{cursor:pointer;font-size:12.5px;color:var(--muted);outline:none;margin-top:12px}
+  details summary:hover{color:var(--ink-2)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="mark">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M2 12h4l2-5 3 10 2.5-7 2 4h6"/>
+      </svg>
+    </div>
+    <div>
+      <h1>QuestCast</h1>
+      <div class="sub">Meta Quest 3 → 电脑 · 局域网直连，不经过云端</div>
+    </div>
+    <div class="spacer"></div>
+    <div class="pill"><span class="dot" id="sdot"></span><span id="stext">检测中…</span></div>
+  </header>
+
+  <!-- onboarding -->
+  <div class="onboard" id="onboard">
+    <h3>首次使用：三步搞定</h3>
+    <p>需要先把运行组件下载到本地（约 60 MB，只下一次）。</p>
+    <div class="steps">
+      <div class="step">
+        <div class="n">1</div>
+        <div class="st">头显开启开发者模式</div>
+        <div class="sd">手机装 Meta Horizon App → 配对头显 → 设置里打开「开发者模式」</div>
+      </div>
+      <div class="step">
+        <div class="n">2</div>
+        <div class="st">下载本地组件</div>
+        <div class="sd">自动获取 adb 与 scrcpy，全部放在本工具目录下</div>
+      </div>
+      <div class="step">
+        <div class="n">3</div>
+        <div class="st">USB 连线并授权</div>
+        <div class="sd">线连电脑，头显里弹出「允许 USB 调试」时点允许</div>
+      </div>
+    </div>
+    <button class="btn primary" id="btnSetup">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 19h16"/></svg>
+      下载组件
+    </button>
+  </div>
+
+  <div class="live" id="liveBar">
+    <span class="dot live"></span>
+    <span class="t">正在投屏</span>
+    <span class="clock" id="clock">00:00</span>
+    <button class="btn sm danger" id="btnStop2">停止</button>
+  </div>
+
+  <div class="live warnbar" id="authWarn">
+    <span class="dot warn"></span>
+    <span class="t" style="color:#b54708">头显未授权调试</span>
+    <span style="font-size:12.5px;color:#93370d">戴上头显，在弹出的「允许 USB 调试吗」里勾选「一律允许」再点允许 —— 只需一次，之后永久记住</span>
+    <button class="btn sm" id="btnReauth" style="margin-left:auto;flex:0 0 auto">重新触发</button>
+  </div>
+
+  <div class="live warnbar" id="screenWarn">
+    <span class="dot warn"></span>
+    <span class="t" style="color:#b54708">头显屏幕处于熄灭状态</span>
+    <span style="font-size:12.5px;color:#93370d">未佩戴时近距感应会自动息屏，此时投屏画面是全黑的</span>
+    <button class="btn sm" id="btnWake" style="margin-left:auto;flex:0 0 auto">唤醒</button>
+  </div>
+
+  <div class="grid">
+    <!-- 左列 -->
+    <div class="col">
+      <div class="card">
+        <h2>设备</h2>
+        <div id="devBox"></div>
+        <div class="hint" id="devHint">用 USB-C 数据线连接头显，并在头显内允许 USB 调试。</div>
+      </div>
+
+      <div class="card">
+        <h2>VR 应用</h2>
+        <div class="hint" style="margin:0 0 12px">在电脑上直接启动头显里的 VR 应用，投屏会立刻切到该应用的实时画面。</div>
+        <div class="row">
+          <select id="appSel"><option value="">—</option></select>
+          <button class="btn sm" id="btnLaunch" style="flex:0 0 auto">启动</button>
+        </div>
+        <div class="row" style="margin-top:9px">
+          <button class="btn sm" id="btnHome">回到头显主界面</button>
+          <button class="btn sm" id="btnReloadApps" style="flex:0 0 auto">刷新</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>无线连接（可选）</h2>
+        <div class="hint" style="margin:0 0 12px">先用 USB 连一次，把无线调试打开后就能拔线，延迟略高于有线。</div>
+        <button class="btn sm" id="btnWifi" style="width:100%">开启无线并自动连接</button>
+        <details>
+          <summary>手动填写 IP 连接</summary>
+          <div class="row" style="margin-top:9px">
+            <input type="text" id="ipInput" placeholder="192.168.1.23:5555">
+            <button class="btn sm" id="btnConnect" style="flex:0 0 auto">连接</button>
+          </div>
+        </details>
+      </div>
+    </div>
+
+    <!-- 右列 -->
+    <div class="col">
+      <div class="card">
+        <h2>投屏参数</h2>
+        <div class="row">
+          <div class="field">
+            <label class="lbl">分辨率</label>
+            <select id="maxSize">
+              <option value="1280">1280 · 省带宽</option>
+              <option value="1920" selected>1920 · 推荐</option>
+              <option value="2560">2560 · 清晰</option>
+              <option value="0">原生分辨率</option>
+            </select>
+          </div>
+          <div class="field">
+            <label class="lbl">码率</label>
+            <select id="bitrate">
+              <option value="8M">8 Mbps</option>
+              <option value="16M">16 Mbps</option>
+              <option value="20M" selected>20 Mbps</option>
+              <option value="32M">32 Mbps</option>
+              <option value="50M">50 Mbps</option>
+            </select>
+          </div>
+          <div class="field">
+            <label class="lbl">帧率</label>
+            <select id="fps">
+              <option value="30">30</option>
+              <option value="60" selected>60</option>
+              <option value="72">72</option>
+              <option value="90">90</option>
+              <option value="120">120</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="field">
+          <label class="lbl">视图</label>
+          <select id="view">
+            <option value="left" selected>单眼 · 左眼（推荐，画面最干净）</option>
+            <option value="both">双眼拼接 · 原始画面</option>
+            <option value="right">单眼 · 右眼</option>
+          </select>
+          <div class="hint" style="margin-top:7px">投屏内容 = 你戴着头显时看到的画面。停在主界面且开着透视时，看到的就是真实房间；打开 VR 应用后即为 VR 画面。</div>
+        </div>
+
+        <div class="toggles">
+          <label class="tg" id="tgRec"><input type="checkbox" id="record"><span class="sw"></span>同步录制 MP4</label>
+          <label class="tg" id="tgTop"><input type="checkbox" id="alwaysOnTop" checked><span class="sw"></span>窗口置顶</label>
+          <label class="tg" id="tgAudio"><input type="checkbox" id="audio"><span class="sw"></span>传输音频</label>
+          <label class="tg" id="tgFull"><input type="checkbox" id="fullscreen"><span class="sw"></span>全屏显示</label>
+          <label class="tg" id="tgWake"><input type="checkbox" id="keepAwake" checked><span class="sw"></span>启动时唤醒头显</label>
+        </div>
+
+        <details>
+          <summary>高级：附加参数</summary>
+          <div class="field" style="margin-top:9px">
+            <input type="text" id="extra" placeholder="例如 --crop=1920:1080:0:0">
+          </div>
+        </details>
+
+        <div class="actions">
+          <button class="btn primary" id="btnStart">开始投屏</button>
+          <button class="btn" id="btnShot" title="保存一张当前画面">截图</button>
+          <button class="btn" id="btnFolder" title="打开录制文件夹">录制</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="logbar">
+          <h2>运行日志</h2>
+        </div>
+        <div class="log" id="log"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+const $ = s => document.querySelector(s);
+let S = null;
+let lastLogLen = -1;
+
+function toast(msg){
+  const t = $('#toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(t._h);
+  t._h = setTimeout(()=>t.classList.remove('show'), 2600);
+}
+
+async function api(path, body){
+  try{
+    const r = await fetch(path, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(body || {})
+    });
+    return await r.json();
+  }catch(e){
+    toast('请求失败：' + e.message);
+    return {ok:false};
+  }
+}
+
+function fmtTime(sec){
+  const m = String(Math.floor(sec/60)).padStart(2,'0');
+  const s = String(sec%60).padStart(2,'0');
+  return m+':'+s;
+}
+function fmtSize(b){
+  if(b > 1048576) return (b/1048576).toFixed(1)+' MB';
+  return Math.round(b/1024)+' KB';
+}
+
+const DEV_ICON = `<div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9h16a2 2 0 0 1 2 2v2a3 3 0 0 1-5.2 2L15 13H9l-1.8 2A3 3 0 0 1 2 13v-2a2 2 0 0 1 2-2z"/><circle cx="7" cy="12" r="1.4"/><circle cx="17" cy="12" r="1.4"/></svg></div>`;
+
+function renderDevice(st){
+  const box = $('#devBox');
+  const ready = (st.devices||[]).filter(d=>d.state==='device');
+  const unauth = (st.devices||[]).filter(d=>d.state==='unauthorized');
+  const offline = (st.devices||[]).filter(d=>d.state==='offline');
+
+  if(ready.length){
+    const d = ready[0], i = st.info || {};
+    const nm = i.model || d.model || 'Quest 设备';
+    const bits = [];
+    if(i.android) bits.push('Android ' + i.android);
+    if(i.battery != null) bits.push(i.battery + '% 电量');
+    bits.push(d.serial.includes(':') ? '无线' : 'USB');
+    box.innerHTML = `<div class="dev">${DEV_ICON}<div><div class="nm">${nm}</div><div class="meta">${bits.join(' · ')}</div></div></div>`;
+    $('#devHint').textContent = '设备已授权，可以开始投屏。';
+    return;
+  }
+  if(unauth.length){
+    box.innerHTML = `<div class="empty" style="color:#b54708;border-color:#fbd5a1;background:#fffcf5">设备已连接，等待授权</div>`;
+    $('#devHint').textContent = '请戴上头显，在弹出的「允许 USB 调试吗？」对话框里勾选「一律允许」并点确定。';
+    return;
+  }
+  if(offline.length){
+    box.innerHTML = `<div class="empty">设备离线，尝试重新插拔数据线</div>`;
+    $('#devHint').textContent = '检测到离线设备记录，重新插拔 USB 或执行一次无线重连。';
+    return;
+  }
+  box.innerHTML = `<div class="empty">未检测到设备</div>`;
+  $('#devHint').textContent = st.ready
+    ? '用 USB-C 数据线连接头显，并在头显内允许 USB 调试。'
+    : '先下载运行组件，再用 USB 线连接头显。';
+}
+
+function renderLog(st){
+  const lines = st.log || [];
+  if(lines.length === lastLogLen) return;
+  lastLogLen = lines.length;
+  const el = $('#log');
+  const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
+  el.innerHTML = lines.map(l=>{
+    const cls = l.level === 'ok' ? 'ok' : l.level === 'warn' ? 'warn' : l.level === 'err' ? 'err' : '';
+    return `<div class="ln ${cls}"><span class="tm">${l.t}</span>${String(l.msg).replace(/</g,'&lt;')}</div>`;
+  }).join('');
+  if(atBottom) el.scrollTop = el.scrollHeight;
+}
+
+function render(st){
+  S = st;
+  // 状态条
+  const sd = $('#sdot'), stx = $('#stext');
+  sd.className = 'dot';
+  if(!st.ready){ stx.textContent = '组件未就绪'; sd.classList.add('warn'); }
+  else if(st.casting){ stx.textContent = '投屏中'; sd.classList.add('live'); }
+  else if((st.devices||[]).some(d=>d.state==='device')){ stx.textContent = '设备已连接'; sd.classList.add('ok'); }
+  else { stx.textContent = '等待设备'; }
+
+  $('#onboard').classList.toggle('show', !st.ready);
+  $('#liveBar').classList.toggle('show', !!st.casting);
+  if(st.casting) $('#clock').textContent = fmtTime(st.elapsed||0);
+
+  const hasDev = (st.devices||[]).some(d=>d.state==='device');
+  if(hasDev && !appsLoaded) loadApps();
+  const unauth = (st.devices||[]).some(d=>d.state==='unauthorized');
+  $('#authWarn').classList.toggle('show', unauth);
+  const screenOff = hasDev && (st.info||{}).screen === 'OFF';
+  $('#screenWarn').classList.toggle('show', screenOff);
+
+  $('#btnStart').disabled = !st.ready || st.casting;
+  $('#btnStart').textContent = st.casting ? '投屏中…' : '开始投屏';
+  $('#btnSetup').disabled = !!st.setupRunning;
+  if(st.setupRunning) $('#btnSetup').textContent = '下载中…';
+
+  renderDevice(st);
+  renderLog(st);
+}
+
+async function poll(){
+  try{
+    const r = await fetch('/api/state');
+    render(await r.json());
+  }catch(e){ /* 服务未启动 */ }
+}
+
+// 开关高亮
+['record','alwaysOnTop','audio','fullscreen','keepAwake'].forEach(id=>{
+  const box = $('#'+id);
+  if(!box) return;
+  const tg = box.closest('.tg');
+  const sync = ()=> tg.classList.toggle('on', box.checked);
+  box.addEventListener('change', sync); sync();
+});
+
+function cfg(){
+  return {
+    maxSize: $('#maxSize').value,
+    bitrate: $('#bitrate').value,
+    fps: $('#fps').value,
+    view: $('#view').value,
+    record: $('#record').checked,
+    alwaysOnTop: $('#alwaysOnTop').checked,
+    audio: $('#audio').checked,
+    fullscreen: $('#fullscreen').checked,
+    keepAwake: $('#keepAwake').checked,
+    extra: $('#extra').value
+  };
+}
+
+$('#btnSetup').onclick = async ()=>{
+  const r = await api('/api/setup');
+  if(r.ok) toast('已开始下载，请稍候…');
+  else toast(r.error || '启动失败');
+};
+
+$('#btnStart').onclick = async ()=>{
+  $('#btnStart').disabled = true;
+  const r = await api('/api/start', cfg());
+  if(!r.ok) toast(r.error || '启动失败');
+  else toast(r.record ? '已开始投屏，同时录制中' : '投屏窗口已打开');
+  poll();
+};
+
+$('#btnStop2').onclick = async ()=>{
+  await api('/api/stop');
+  toast('已停止投屏');
+  poll();
+};
+
+$('#btnWifi').onclick = async ()=>{
+  toast('正在切换无线调试…');
+  const r = await api('/api/wireless');
+  toast(r.ok ? r.msg : (r.error || '无线连接失败'));
+  poll();
+};
+
+$('#btnConnect').onclick = async ()=>{
+  const r = await api('/api/connect', {addr: $('#ipInput').value});
+  toast(r.ok ? '已连接' : (r.error || '连接失败'));
+  poll();
+};
+
+$('#btnShot').onclick = async ()=>{
+  const r = await api('/api/screenshot');
+  if(r.ok && r.blank) toast('抓到黑帧：头显熄屏了，戴上头显再试');
+  else if(r.ok) toast('截图已保存到 recordings 文件夹');
+  else toast(r.error || '截图失败');
+};
+
+$('#btnWake').onclick = async ()=>{
+  const r = await api('/api/wake');
+  toast(r.ok ? '已唤醒，屏幕已点亮' : (r.error || '唤醒失败'));
+  poll();
+};
+
+$('#btnReauth').onclick = async ()=>{
+  toast('正在重新触发授权…');
+  const r = await api('/api/reauth');
+  toast(r.ok ? '已授权，设备已连接' : (r.error || '仍未授权'));
+  poll();
+};
+
+let appsLoaded = false;
+async function loadApps(refresh){
+  const sel = $('#appSel');
+  sel.innerHTML = '<option value="">加载中…</option>';
+  const r = await api('/api/apps', {refresh: !!refresh});
+  if(!r.ok || !r.apps || !r.apps.length){
+    sel.innerHTML = '<option value="">未找到 VR 应用</option>';
+    return;
+  }
+  sel.innerHTML = r.apps.map(a=>`<option value="${a.pkg}">${a.label}</option>`).join('');
+  appsLoaded = true;
+}
+
+$('#btnLaunch').onclick = async ()=>{
+  const pkg = $('#appSel').value;
+  if(!pkg) return toast('请先选择一个应用');
+  const r = await api('/api/launch', {pkg});
+  toast(r.ok ? '已在头显中启动，投屏会自动切换' : (r.error || '启动失败'));
+  poll();
+};
+
+$('#btnHome').onclick = async ()=>{
+  await api('/api/home');
+  toast('已回到头显主界面');
+};
+
+$('#btnReloadApps').onclick = ()=> loadApps(true);
+
+$('#btnFolder').onclick = ()=> api('/api/open-folder');
+
+poll();
+setInterval(poll, 1500);
+</script>
+</body>
+</html>
